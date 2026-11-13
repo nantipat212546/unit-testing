@@ -1,0 +1,947 @@
+# **สรุป Lab 3: API Testing และเริ่ม Lab 4: Unit Testing with Jest**
+
+คุณผ่าน API Testing ครบ **14/14 Tests** แล้ว ตอนนี้เราเรียนมาแล้ว 3 หัวข้อ ได้แก่ Cookies, MVC และ API Testing เหลือหัวข้อ Unit Testing with Jest ซึ่งเราจะฝึกตามสไลด์ `10. Unit Testing with Jest.pdf` ที่คุณอัปโหลดไว้
+
+## **Part 1 — สรุป API Testing สำหรับสอบ**
+
+### **1. API Testing คืออะไร?**
+
+API Testing คือการทดสอบการทำงานของ API โดยส่ง HTTP Request และตรวจสอบ HTTP Response ว่าตรงตามที่คาดหวังหรือไม่
+
+ใน Lab ที่ผ่านมา คุณได้ใช้ Postman ทดสอบ Product API ที่สร้างจาก Express.js และ MySQL
+
+| HTTP Method | หน้าที่     | ตัวอย่าง                 |
+| ----------- | ----------- | ------------------------ |
+| GET         | อ่านข้อมูล  | ดึงรายการสินค้า          |
+| POST        | สร้างข้อมูล | เพิ่มสินค้าใหม่          |
+| PUT         | แก้ไขข้อมูล | เปลี่ยนชื่อและราคาสินค้า |
+| DELETE      | ลบข้อมูล    | Soft Delete สินค้า       |
+
+### **2. HTTP Status Code ที่ต้องจำ**
+
+| Status                      | ความหมาย                 |
+| --------------------------- | ------------------------ |
+| `200 OK`                    | Request สำเร็จ           |
+| `201 Created`               | สร้างข้อมูลสำเร็จ        |
+| `400 Bad Request`           | ข้อมูลที่ส่งมาไม่ถูกต้อง |
+| `401 Unauthorized`          | ยังไม่ได้ยืนยันตัวตน     |
+| `403 Forbidden`             | ไม่มีสิทธิ์เข้าถึง       |
+| `404 Not Found`             | ไม่พบทรัพยากร            |
+| `500 Internal Server Error` | Server เกิดข้อผิดพลาด    |
+
+### **3. คำสั่ง Postman Automated Tests**
+
+```
+pm.test("Status is 200", function () {
+    pm.response.to.have.status(200);
+});
+```
+
+เป็นการตรวจสอบ HTTP Status Code
+
+```
+const data = pm.response.json();
+
+pm.expect(data.message).to.eql("Product updated");
+```
+
+เป็นการตรวจสอบข้อมูลใน Response Body
+
+```
+pm.collectionVariables.set("productId", data.id);
+```
+
+เป็นการเก็บ ID ไว้ใช้ใน Request ถัดไป
+
+### **4. Positive Testing และ Negative Testing**
+
+- **Positive Testing:** ส่งข้อมูลที่ถูกต้องและคาดหวังว่าระบบจะทำงานสำเร็จ เช่น POST สินค้าที่มีชื่อและราคา
+- **Negative Testing:** ส่งข้อมูลผิดเงื่อนไขและตรวจว่าระบบจัดการได้ถูกต้อง เช่น POST สินค้าที่มีราคาติดลบแล้วคาดหวัง `400`
+
+### **5. ข้อสอบที่มักสับสน**
+
+**HTTP 404 หมายถึง Test Failed เสมอหรือไม่?**
+
+ไม่เสมอไป หากเราต้องการตรวจสอบว่าการเรียกสินค้าที่ถูกลบแล้วต้องได้ 404 และ API ตอบ 404 จริง ถือว่า Test ผ่าน
+
+**API Testing กับ Unit Testing เหมือนกันหรือไม่?**
+
+ไม่เหมือนกัน API Testing ตรวจพฤติกรรมผ่าน API Endpoint ส่วน Unit Testing ตรวจการทำงานของหน่วยโค้ดขนาดเล็ก โดยมักแยกจากระบบภายนอก เช่น Database และ Network
+
+# **Part 2 — Lab 4: Unit Testing with Jest**
+
+💻 Coding Lab — VS Code + Node.js
+
+เราจะเริ่มจากตัวอย่างพื้นฐานตามสไลด์ Jest ก่อน แล้วค่อยต่อยอดไปทดสอบโค้ดของ MVC Lab
+
+## **1. Unit Testing คืออะไร?**
+
+Unit Testing คือการทดสอบหน่วยย่อยของโปรแกรม เช่น Function หนึ่งตัว เพื่อดูว่าเมื่อส่ง Input เข้าไปแล้ว ได้ Output ถูกต้องตามที่กำหนดหรือไม่
+
+ตัวอย่าง:
+
+```
+function add(a, b) {
+    return a + b;
+}
+```
+
+เราต้องการทดสอบว่า `add(2, 3)` ได้ผลลัพธ์เท่ากับ `5`
+
+```
+expect(add(2, 3)).toBe(5);
+```
+
+ในสไลด์ของคุณมีหัวข้อ `test()`, `describe()`, Matchers เช่น `toBe()`, `toEqual()`, `toBeTruthy()`, `toBeFalsy()`, `toContain()` และ `toThrow()` รวมถึง Positive/Negative Test Cases
+
+## **2. เปรียบเทียบ API Testing กับ Unit Testing**
+
+**API Testing**
+
+ส่ง HTTP Request ไปยัง Server แล้วตรวจ Response
+
+Postman → Express → MySQL
+
+**Unit Testing**
+
+เรียก Function โดยตรงและตรวจผลลัพธ์
+
+Jest → Function → Result
+
+ข้อดีของ Unit Testing คือทดสอบได้รวดเร็ว และระบุได้ง่ายขึ้นว่าฟังก์ชันใดทำงานผิดพลาด
+
+## **3. สร้างโปรเจกต์ใหม่**
+
+เราจะสร้างโฟลเดอร์ `jest-lab` แยกจาก `mvc-lab` เพื่อไม่ให้โค้ดปะปนกัน
+
+💻 พิมพ์ใน VS Code Terminal (PowerShell)
+
+```
+
+cd C:\Users\Vivobook\Desktop
+mkdir jest-lab
+cd jest-lab
+
+npm.cmd init -y
+npm.cmd install --save-dev jest
+
+```
+
+คำอธิบาย:
+
+- `npm.cmd init -y` สร้าง `package.json`
+- `npm.cmd install --save-dev jest` ติดตั้ง Jest เป็น Development Dependency
+- Jest เป็นเครื่องมือที่ช่วยรัน Test Cases และรายงานผลว่าผ่านหรือไม่ผ่าน
+
+## **4. ตั้งค่า package.json**
+
+เปิดไฟล์ `package.json` ใน VS Code
+
+ค้นหาส่วน `"scripts"` แล้วแก้เป็น
+
+```
+
+"scripts": {
+    "test": "jest"
+}
+
+```
+
+**สำคัญ:** โค้ดด้านบนเป็นเพียงส่วนหนึ่งของ `package.json` ไม่ใช่ทั้งไฟล์ ให้แก้เฉพาะส่วน `"scripts"` และคงข้อมูลอื่น เช่น `dependencies` หรือ `devDependencies` ไว้
+
+จากนั้นเราจะสามารถรัน Test ด้วยคำสั่ง
+
+```
+npm.cmd test
+```
+
+## **5. สร้างโครงสร้างโปรเจกต์**
+
+```
+jest-lab/
+├── math.js
+├── math.test.js
+├── package.json
+├── package-lock.json
+└── node_modules/
+```
+
+ไฟล์ `math.js` เก็บฟังก์ชันที่ต้องการทดสอบ ส่วน `math.test.js` เก็บ Test Cases
+
+## **6. เขียนฟังก์ชันสำหรับทดสอบ**
+
+💻 สร้างไฟล์ `math.js` แล้ววางโค้ดนี้
+
+```
+
+function add(a, b) {
+    return a + b;
+}
+
+function subtract(a, b) {
+    return a - b;
+}
+
+function multiply(a, b) {
+    return a * b;
+}
+
+function divide(a, b) {
+    if (b === 0) {
+        throw new Error("Cannot divide by zero");
+    }
+
+    return a / b;
+}
+
+module.exports = {
+    add,
+    subtract,
+    multiply,
+    divide
+};
+
+```
+
+เราเขียนฟังก์ชันคำนวณ 4 ตัว โดยฟังก์ชัน `divide()` จะโยน Error หากตัวหารเป็นศูนย์ เพื่อใช้ฝึก `toThrow()` ในภายหลัง
+
+## **7. เขียน Unit Tests**
+
+💻 สร้างไฟล์ `math.test.js` แล้ววางโค้ดนี้
+
+```
+
+const {
+    add,
+    subtract,
+    multiply,
+    divide
+} = require("./math");
+
+describe("Math Functions", () => {
+
+    test("add 2 + 3 should be 5", () => {
+        expect(add(2, 3)).toBe(5);
+    });
+
+    test("subtract 10 - 4 should be 6", () => {
+        expect(subtract(10, 4)).toBe(6);
+    });
+
+    test("multiply 3 * 4 should be 12", () => {
+        expect(multiply(3, 4)).toBe(12);
+    });
+
+    test("divide 10 / 2 should be 5", () => {
+        expect(divide(10, 2)).toBe(5);
+    });
+
+    test("divide by zero should throw error", () => {
+        expect(() => divide(10, 0))
+            .toThrow("Cannot divide by zero");
+    });
+
+});
+
+```
+
+### **อธิบายโครงสร้าง Test**
+
+```
+describe("Math Functions", () => {
+    // Test Cases
+});
+```
+
+`describe()` ใช้จัดกลุ่ม Test Cases ที่เกี่ยวข้องกัน
+
+```
+test("add 2 + 3 should be 5", () => {
+    expect(add(2, 3)).toBe(5);
+});
+```
+
+`test()` ใช้สร้าง Test Case ส่วน `expect()` ใช้กำหนดค่าที่ต้องการตรวจสอบ และ `toBe(5)` เป็น Matcher ที่กำหนดว่าผลลัพธ์ต้องเท่ากับ 5
+
+`it()` สามารถใช้แทน `test()` ได้ เช่น
+
+```
+it("should add two numbers", () => {
+    expect(add(2, 3)).toBe(5);
+});
+```
+
+## **8. รัน Jest**
+
+💻 พิมพ์ใน Terminal
+
+```
+
+npm.cmd test
+
+```
+
+หากทุกอย่างถูกต้อง ควรได้ผลลัพธ์ลักษณะนี้
+
+```
+PASS  ./math.test.js
+  Math Functions
+    ✓ add 2 + 3 should be 5
+    ✓ subtract 10 - 4 should be 6
+    ✓ multiply 3 * 4 should be 12
+    ✓ divide 10 / 2 should be 5
+    ✓ divide by zero should throw error
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+```
+
+นี่คือ Unit Testing ครั้งแรกของเรา โดยไม่ต้องเปิด Docker, MySQL หรือ Express Server
+
+## **9. Matchers ที่ต้องจำสำหรับสอบ**
+
+ตามสไลด์ Jest ของคุณ Matchers คือเครื่องมือเปรียบเทียบค่าจริงกับค่าที่คาดหวัง
+
+| Matcher        | ใช้ตรวจสอบ                                 |
+| -------------- | ------------------------------------------ |
+| `toBe()`       | ค่า Primitive เช่น Number, String, Boolean |
+| `toEqual()`    | ค่าภายใน Object หรือ Array                 |
+| `toBeTruthy()` | ค่าเป็น Truthy                             |
+| `toBeFalsy()`  | ค่าเป็น Falsy                              |
+| `toContain()`  | Array หรือ String มีค่าที่กำหนด            |
+| `toThrow()`    | ฟังก์ชันโยน Error                          |
+
+ตัวอย่างสำหรับอ่านทำความเข้าใจ **ไม่ต้องนำไปวางในไฟล์ตอนนี้**
+
+```
+
+// Number
+expect(10 + 5).toBe(15);
+
+// Object
+expect({ name: "John" }).toEqual({ name: "John" });
+
+// Boolean
+expect(true).toBeTruthy();
+expect(false).toBeFalsy();
+
+// Array
+expect(["JavaScript", "Python"]).toContain("Python");
+
+// Error
+expect(() => divide(10, 0)).toThrow();
+
+```
+
+### **จุดที่ออกสอบได้: toBe() กับ toEqual()**
+
+```
+expect({ name: "John" }).toBe({ name: "John" });
+```
+
+ตัวอย่างนี้ไม่ผ่าน เพราะเป็น Object คนละตัวในหน่วยความจำ
+
+```
+expect({ name: "John" }).toEqual({ name: "John" });
+```
+
+ตัวอย่างนี้ผ่าน เพราะ `toEqual()` เปรียบเทียบค่าภายใน Object
+
+## **10. ลองทำให้ Test Failed**
+
+เพื่อให้เข้าใจว่า Jest ตรวจจับข้อผิดพลาดอย่างไร ให้เปิด `math.test.js` แล้วเปลี่ยน Test แรกชั่วคราวเป็น
+
+```
+
+test("add 2 + 3 should be 6", () => {
+    expect(add(2, 3)).toBe(6);
+});
+
+```
+
+รันอีกครั้ง
+
+```
+npm.cmd test
+```
+
+Jest ควรรายงานประมาณนี้
+
+```
+Expected: 6
+Received: 5
+
+Tests: 1 failed, 4 passed, 5 total
+```
+
+หลังทดลองแล้ว **เปลี่ยน&#x20;**`toBe(6)`**&#x20;กลับเป็น&#x20;**`toBe(5)` และรันใหม่ให้ผ่านครบ 5 Tests
+
+การทดลองนี้สำคัญ เพราะทำให้เห็นว่า Automated Test สามารถตรวจพบความแตกต่างระหว่าง Expected Result กับ Actual Result ได้จริง
+
+## **11. แบบทดสอบความเข้าใจ Jest**
+
+1\. Unit Testing เน้นทดสอบอะไร?
+
+ระบบทั้งหมดผ่าน Browser
+
+ฟังก์ชันหรือหน่วยโค้ดขนาดเล็ก
+
+การเชื่อมต่อ Internet
+
+ถูกต้อง — Unit Testing เน้นตรวจหน่วยโค้ดขนาดเล็กอย่างเป็นอิสระ
+
+2\. ควรใช้ Matcher ใดเปรียบเทียบ Object?
+
+toBe()
+
+toThrow()
+
+toEqual()
+
+คำตอบที่ถูก: toEqual() — toEqual() เปรียบเทียบค่าภายใน Object และ Array
+
+3\. describe() ใช้ทำอะไร?
+
+จัดกลุ่ม Test Cases
+
+เชื่อม MySQL
+
+สร้าง HTTP Server
+
+ถูกต้อง — describe() จัดกลุ่ม Test Cases ที่เกี่ยวข้องกัน
+
+4\. ต้องการทดสอบว่าฟังก์ชันโยน Error ควรใช้อะไร?
+
+toContain()
+
+toThrow()
+
+toBeTruthy()
+
+ถูกต้อง — toThrow() ใช้ตรวจการโยน Error จากฟังก์ชัน
+
+## **คะแนน 3/4**
+
+ตรวจคำตอบ
+
+## **12. ส่งผลการทดลอง Jest**
+
+ผลการรัน `npm.cmd test` เป็นอย่างไร?
+
+ผ่านครบ 5/5 Tests
+
+ติดตั้ง Jest หรือรัน npm test ไม่ได้
+
+มี Test Failed
+
+ยังทำไม่ครบ
+
+ส่งผลการทดสอบ&#x20;
+
+**ขั้นต่อไป:** เราจะฝึก `validateUsername()` ตามตัวอย่างในสไลด์ Jest โดยเน้น Positive Testing, Negative Testing, Boundary Values และ Matchers จากนั้นจึงต่อยอดสู่การทดสอบฟังก์ชันของ MVC Lab จริง ๆ
+
+
+
+
+# **Jest Lab — Step 2: validateUsername, Positive/Negative Testing และ Matchers**
+
+Step 1 ผ่านแล้ว — 5/5 Tests
+
+รอบนี้เราจะทำตามตัวอย่าง `validateUsername()` จากสไลด์ **10. Unit Testing with Jest.pdf** โดยตรง แล้วเพิ่มแบบฝึก Matchers เพื่อเตรียมสอบ
+
+เป้าหมายคือเขียนฟังก์ชันตรวจสอบ Username และออกแบบ Test Cases ให้ครอบคลุมทั้งข้อมูลที่ถูกต้อง ข้อมูลที่ผิด และค่าขอบเขต (Boundary Values)
+
+## **1. Requirement จากสไลด์**
+
+Username ที่ถูกต้องต้องมีคุณสมบัติดังนี้
+
+- มีความยาวตั้งแต่ **5–20 ตัวอักษร**
+- ต้องขึ้นต้นด้วยตัวอักษรภาษาอังกฤษ `A–Z` หรือ `a–z`
+- อนุญาตเฉพาะตัวอักษรภาษาอังกฤษ ตัวเลข และ `_`
+- ห้ามมีช่องว่างหรืออักขระพิเศษอื่น
+
+ลองทดสอบเงื่อนไขด้วยตัวเองก่อนเขียนโค้ด
+
+ทดลองตรวจสอบ Username
+
+Valid Username (true)
+
+ความยาว: 8 ตัวอักษร
+
+john1john1johnjohn doeUser_123abcdefghijklmnopqrst
+
+ตัวทดลองนี้ใช้กฎเดียวกับตัวอย่างในสไลด์
+
+## **2. เตรียมโปรเจกต์**
+
+ใช้โปรเจกต์เดิมที่คุณสร้างไว้
+
+```
+
+cd C:\Users\Vivobook\Desktop\jest-lab
+code .
+
+```
+
+ไม่ต้องติดตั้ง Jest ใหม่
+
+โครงสร้างไฟล์หลังจบ Step 2 จะเป็นดังนี้
+
+```
+jest-lab/
+├── math.js
+├── math.test.js
+├── validateUsername.js       ← สร้างใหม่
+├── validateUsername.test.js  ← สร้างใหม่
+├── matchers.test.js          ← สร้างใหม่
+├── package.json
+└── node_modules/
+```
+
+## **3. สร้างฟังก์ชัน validateUsername()**
+
+💻 สร้างไฟล์ `validateUsername.js` ใน VS Code
+
+คัดลอกโค้ดต่อไปนี้ ซึ่งใช้เงื่อนไขเดียวกับฟังก์ชันในสไลด์
+
+```
+
+function validateUsername(username) {
+
+    // Username must be a string
+    if (typeof username !== "string") {
+        return false;
+    }
+
+    // Length must be between 5 and 20
+    if (username.length < 5 || username.length > 20) {
+        return false;
+    }
+
+    // Must start with a letter
+    if (!/^[A-Za-z]/.test(username)) {
+        return false;
+    }
+
+    // Only letters, numbers, underscore
+    if (!/^[A-Za-z0-9_]+$/.test(username)) {
+        return false;
+    }
+
+    return true;
+}
+
+module.exports = validateUsername;
+
+```
+
+### **อธิบายโค้ดสำคัญ**
+
+**1. ตรวจชนิดข้อมูล**
+
+```
+typeof username !== "string"
+```
+
+ป้องกันการส่งข้อมูลที่ไม่ใช่ String เช่น `12345` หรือ `null`
+
+**2. ตรวจความยาว**
+
+```
+username.length < 5 || username.length > 20
+```
+
+ถ้าสั้นกว่า 5 หรือยาวกว่า 20 ให้คืนค่า `false`
+
+**3. ตรวจด้วย Regular Expression (Regex)**
+
+```
+/^[A-Za-z]/
+```
+
+หมายถึงตัวอักษรตัวแรกต้องเป็นภาษาอังกฤษ
+
+```
+/^[A-Za-z0-9_]+$/
+```
+
+หมายถึงข้อความทั้งหมดต้องประกอบด้วยตัวอักษรภาษาอังกฤษ ตัวเลข หรือ `_` เท่านั้น
+
+## **4. ออกแบบ Test Cases**
+
+สไลด์แบ่งการทดสอบออกเป็น Positive และ Negative Test Cases
+
+### **Positive Test Cases**
+
+ข้อมูลถูกต้องตาม Requirement จึงคาดหวัง `true`
+
+| ID | Input                  | เหตุผล                  | Expected |
+| -- | ---------------------- | ----------------------- | -------- |
+| P1 | `john1`                | ยาว 5 ตัว               | true     |
+| P2 | `john_doe`             | มี Underscore           | true     |
+| P3 | `User_123`             | ตัวอักษร ตัวเลข และ `_` | true     |
+| P4 | `abcde12345`           | ตัวอักษรและตัวเลข       | true     |
+| P5 | `abcdefghijklmnopqrst` | ยาว 20 ตัว              | true     |
+
+### **Negative Test Cases**
+
+ข้อมูลผิด Requirement จึงคาดหวัง `false`
+
+| ID | Input                   | เหตุผล            | Expected |
+| -- | ----------------------- | ----------------- | -------- |
+| N1 | `john`                  | ยาว 4 ตัว         | false    |
+| N2 | `abcdefghijklmnopqrstu` | ยาว 21 ตัว        | false    |
+| N3 | `1john`                 | ขึ้นต้นด้วยตัวเลข | false    |
+| N4 | `john doe`              | มีช่องว่าง        | false    |
+| N5 | `john@123`              | มีอักขระพิเศษ     | false    |
+
+## **5. เขียน Jest Tests ตามสไลด์**
+
+💻 สร้างไฟล์ `validateUsername.test.js`
+
+```
+
+const validateUsername = require("./validateUsername");
+
+describe("validateUsername", () => {
+
+    // Positive Test Cases
+
+    test("P1: minimum length 5", () => {
+        expect(validateUsername("john1")).toBe(true);
+    });
+
+    test("P2: contains underscore", () => {
+        expect(validateUsername("john_doe")).toBe(true);
+    });
+
+    test("P3: letters numbers underscore", () => {
+        expect(validateUsername("User_123")).toBe(true);
+    });
+
+    test("P4: letters and numbers", () => {
+        expect(validateUsername("abcde12345")).toBe(true);
+    });
+
+    test("P5: maximum length 20", () => {
+        expect(
+            validateUsername("abcdefghijklmnopqrst")
+        ).toBe(true);
+    });
+
+    // Negative Test Cases
+
+    test("N1: shorter than 5", () => {
+        expect(validateUsername("john")).toBe(false);
+    });
+
+    test("N2: longer than 20", () => {
+        expect(
+            validateUsername("abcdefghijklmnopqrstu")
+        ).toBe(false);
+    });
+
+    test("N3: starts with number", () => {
+        expect(validateUsername("1john")).toBe(false);
+    });
+
+    test("N4: contains spaces", () => {
+        expect(validateUsername("john doe")).toBe(false);
+    });
+
+    test("N5: invalid character", () => {
+        expect(validateUsername("john@123")).toBe(false);
+    });
+
+});
+
+```
+
+### **รันเฉพาะไฟล์นี้**
+
+```
+
+npm.cmd test -- validateUsername.test.js
+
+```
+
+ผลลัพธ์ที่คาดหวัง:
+
+```
+PASS  ./validateUsername.test.js
+
+Test Suites: 1 passed, 1 total
+Tests:       10 passed, 10 total
+```
+
+## **6. Boundary Value Testing**
+
+นี่เป็นหัวข้อที่สำคัญในสไลด์ เพราะข้อผิดพลาดจำนวนมากเกิดบริเวณเงื่อนไข `<`, `<=`, `>` และ `>=`
+
+สำหรับ Username เรามีขอบเขตที่ 5 และ 20 ตัวอักษร
+
+ขอบเขตความยาว Username
+
+## **4**
+
+Reject
+
+## **5**
+
+Pass
+
+## **6**
+
+Pass
+
+## **20**
+
+Pass
+
+## **21**
+
+Reject
+
+ความยาว 5 และ 20 ผ่าน ส่วน 4 และ 21 ไม่ผ่าน
+
+### **เพิ่ม Boundary Tests**
+
+💻 เพิ่มโค้ดต่อท้าย `validateUsername.test.js`
+
+```
+
+describe("Boundary Value Testing", () => {
+
+    test("4 characters should fail", () => {
+        expect(validateUsername("abcd")).toBe(false);
+    });
+
+    test("5 characters should pass", () => {
+        expect(validateUsername("abcde")).toBe(true);
+    });
+
+    test("6 characters should pass", () => {
+        expect(validateUsername("abcdef")).toBe(true);
+    });
+
+    test("20 characters should pass", () => {
+        expect(validateUsername("a".repeat(20))).toBe(true);
+    });
+
+    test("21 characters should fail", () => {
+        expect(validateUsername("a".repeat(21))).toBe(false);
+    });
+
+});
+
+```
+
+ตอนนี้ไฟล์ `validateUsername.test.js` จะมี 15 Tests
+
+## **7. เพิ่ม Negative Tests สำหรับชนิดข้อมูล**
+
+ในสไลด์ยังมีตัวอย่างการส่ง `null`, Number และ Empty String ซึ่งควรถูกปฏิเสธ
+
+💻 เพิ่มต่อท้ายไฟล์ `validateUsername.test.js`
+
+```
+
+describe("Invalid Data Types", () => {
+
+    test("null should fail", () => {
+        expect(validateUsername(null)).toBe(false);
+    });
+
+    test("number should fail", () => {
+        expect(validateUsername(12345)).toBe(false);
+    });
+
+    test("empty string should fail", () => {
+        expect(validateUsername("")).toBe(false);
+    });
+
+});
+
+```
+
+รวมทั้งหมดตอนนี้ **18 Tests สำหรับ validateUsername()**
+
+## **8. ฝึก Matchers เพิ่มเติม**
+
+สไลด์ระบุ Matchers สำคัญ 6 ตัว ได้แก่ `toBe`, `toEqual`, `toBeTruthy`, `toBeFalsy`, `toContain` และ `toThrow`
+
+💻 สร้างไฟล์ `matchers.test.js`
+
+ตัวอย่างนี้เป็นแบบฝึกเพิ่มเติมเพื่อให้คุณทดลอง Matchers ทุกตัวในไฟล์เดียว
+
+```
+
+describe("Jest Matchers", () => {
+
+    test("toBe: compare numbers", () => {
+        expect(2 + 3).toBe(5);
+    });
+
+    test("toEqual: compare objects", () => {
+        const user = {
+            name: "John",
+            age: 20
+        };
+
+        expect(user).toEqual({
+            name: "John",
+            age: 20
+        });
+    });
+
+    test("toBeTruthy: non-empty string", () => {
+        expect("Hello").toBeTruthy();
+    });
+
+    test("toBeFalsy: empty string", () => {
+        expect("").toBeFalsy();
+    });
+
+    test("toContain: array contains item", () => {
+        const languages = [
+            "JavaScript",
+            "Python",
+            "Java"
+        ];
+
+        expect(languages).toContain("Python");
+    });
+
+    test("toThrow: error handling", () => {
+        function divide(a, b) {
+            if (b === 0) {
+                throw new Error("Cannot divide by zero");
+            }
+
+            return a / b;
+        }
+
+        expect(() => divide(10, 0))
+            .toThrow("Cannot divide by zero");
+    });
+
+});
+
+```
+
+### **ข้อควรจำสำหรับสอบ**
+
+`toBe()` เหมาะกับการเปรียบเทียบ Primitive Values ส่วน `toEqual()` ใช้เปรียบเทียบข้อมูลภายใน Object และ Array
+
+`toBeTruthy()` ไม่ได้หมายถึงต้องเป็น `true` เท่านั้น เช่น `"Hello"` ก็เป็น Truthy
+
+`toBeFalsy()` ไม่ได้หมายถึงต้องเป็น `false` เท่านั้น เช่น `0`, `""`, `null` และ `undefined` เป็น Falsy
+
+## **9. รันทดสอบทั้งหมด**
+
+💻 ทำใน Terminal
+
+```
+
+npm.cmd test
+
+```
+
+หากยังมีไฟล์ `math.test.js` จาก Step 1 และเพิ่มทุก Test ตามขั้นตอนนี้ จะได้ผลลัพธ์ที่คาดหวังดังนี้
+
+**math.test.js**
+
+5 Tests
+
+**validateUsername.test.js**
+
+18 Tests
+
+**matchers.test.js**
+
+6 Tests
+
+Test Suites
+
+# **3 / 3**
+
+Total Tests
+
+# **29 / 29**
+
+ผลลัพธ์ที่คาดหวังเมื่อรันทุกไฟล์สำเร็จ
+
+## **10. แบบทดสอบเตรียมสอบ Jest**
+
+1\. Username ต้องมีอย่างน้อย 5 ตัวอักษร ข้อใดเป็น Boundary Value ที่ควรทดสอบ?
+
+4, 5, 6
+
+10, 12, 15
+
+15, 17, 19
+
+ถูกต้อง — ควรทดสอบค่าต่ำกว่าขอบเขต เท่าขอบเขต และสูงกว่าขอบเขต
+
+2\. validateUsername('1john') ควรได้อะไร?
+
+true
+
+false
+
+undefined
+
+ถูกต้อง — Username ต้องขึ้นต้นด้วยตัวอักษรภาษาอังกฤษ
+
+3\. Matcher ใดใช้ตรวจ Object?
+
+toBe()
+
+toEqual()
+
+toThrow()
+
+คำตอบที่ถูก: toEqual() — toEqual() ตรวจค่าใน Object แบบเปรียบเทียบโครงสร้าง
+
+4\. expect('').toBeFalsy() จะผ่านหรือไม่?
+
+ผ่าน
+
+ไม่ผ่าน
+
+คำตอบที่ถูก: ผ่าน — Empty String เป็น Falsy ใน JavaScript
+
+5\. ใน AAA Pattern ตัว A ตัวสุดท้ายหมายถึงอะไร?
+
+Arrange
+
+Act
+
+Assert
+
+ถูกต้อง — Assert คือขั้นตอนตรวจผลลัพธ์ที่ได้กับค่าที่คาดหวัง
+
+## **คะแนน 3/5**
+
+ตรวจคำตอบ
+
+## **11. ส่งผลการทดลอง**
+
+ผลการรัน Jest Step 2 เป็นอย่างไร?
+
+ผ่านครบ 29/29 Tests
+
+มี Test Failed
+
+มี Error ในโค้ดหรือการรัน Jest
+
+ยังทำไม่ครบ
+
+ส่งผลการทดสอบ&#x20;
+
+ขั้นต่อไปเราจะฝึก **AAA Pattern (Arrange–Act–Assert)** และ **Test-Driven Development (Red–Green–Refactor)** ซึ่งอยู่ในสไลด์ Jest เช่นกัน พร้อมสรุปเนื้อหาที่ต้องจำสำหรับสอบทั้งหมด
+
+
+
+
+npm.cmd test
